@@ -1,0 +1,12 @@
+[package]
+name = "cya"
+version = "0.0.1"
+authors = ["Ridwan Hoq <ridhoq@users.noreply.github.com>"]
+edition = "2018"
+description = "A HTTP load testing utility"
+license = "MIT"
+repository = "https://github.com/ridhoq/cya"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
