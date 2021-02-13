@@ -10,11 +10,11 @@ fn get_user_agent() -> String {
 }
 
 /// Runs the load test
-pub async fn run_test(url_arg: Url, requests: i32, _workers: i32) -> Result<()> {
+pub async fn run_test(url_arg: Url, requests: i32, connections: i32) -> Result<()> {
     let url = Arc::new(url_arg);
     let succeeded = Arc::new(Mutex::new(0));
 
-    let (sender, mut reciever) = mpsc::channel(32);
+    let (sender, mut reciever) = mpsc::channel(connections as usize);
     task::spawn(async move {
         for _ in 0..requests {
             let url = Arc::clone(&url);
