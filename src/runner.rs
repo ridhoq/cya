@@ -16,16 +16,12 @@ pub async fn run_test(url_arg: Url, requests: i32, _workers: i32) -> Result<()> 
 
     let (sender, mut reciever) = mpsc::channel(32);
     task::spawn(async move {
-        let url_clone = url.clone();
         for _ in 0..requests {
-            let url_clone_clone = url_clone.clone();
+            let url = Arc::clone(&url);
             let handle = task::spawn(async move {
-                let url_clone_clone_clone = url_clone_clone.clone();
+                let url = Arc::clone(&url);
                 let client = Client::builder().user_agent(get_user_agent()).build()?;
-                client
-                    .request(Method::GET, url_clone_clone_clone.as_str())
-                    .send()
-                    .await
+                client.request(Method::GET, url.as_str()).send().await
             });
             sender.send(handle).await;
         }
