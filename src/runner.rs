@@ -1,12 +1,9 @@
 use anyhow::Result;
-// use async_std::channel::unbounded;
-// use async_std::task;
-use reqwest::{Client, Method, Request, Response, Url};
+use reqwest::{Client, Method, Url};
 use std::option::Option::Some;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use tokio::task;
-use std::ops::Add;
 
 fn get_user_agent() -> String {
     format!("{}/{}", clap::crate_name!(), clap::crate_version!())
@@ -15,10 +12,10 @@ fn get_user_agent() -> String {
 /// Runs the load test
 pub async fn run_test(url_arg: Url, requests: i32, _workers: i32) -> Result<()> {
     let url = Arc::new(url_arg);
-    let mut succeeded = 0;
+    let succeeded = Arc::new(Mutex::new(0));
 
     let (sender, mut reciever) = mpsc::channel(32);
-    let send_handle = task::spawn(async move {
+    task::spawn(async move {
         let url_clone = url.clone();
         for _ in 0..requests {
             let url_clone_clone = url_clone.clone();
@@ -34,17 +31,19 @@ pub async fn run_test(url_arg: Url, requests: i32, _workers: i32) -> Result<()> 
         }
     });
 
-    let recieve_handle = task::spawn(async move {
+    let receive_handle = task::spawn(async move {
         while let Some(res) = reciever.recv().await {
             let thing = res.await.expect("oops");
             let real_res = thing.expect("oof");
             if real_res.status().is_success() {
-                succeeded += 1;
+                let mut succeeded_lock = succeeded.lock().expect("Could not acquire lock");
+                *succeeded_lock += 1;
             }
         }
+        let succeeded_lock = succeeded.lock().unwrap();
+        println!("succeeded requests: {}", *succeeded_lock);
     });
 
-    recieve_handle.await?;
-    println!("succeeded requests: {}", succeeded);
+    receive_handle.await?;
     Ok(())
 }
