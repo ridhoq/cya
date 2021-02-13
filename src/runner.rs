@@ -4,15 +4,19 @@ use std::option::Option::Some;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use tokio::task;
+use uuid::Uuid;
 
-fn get_user_agent() -> String {
-    format!("{}/{}", clap::crate_name!(), clap::crate_version!())
+fn get_user_agent(id: Uuid) -> String {
+    format!("{}/{}/{}", clap::crate_name!(), clap::crate_version!(), id)
 }
 
 /// Runs the load test
 pub async fn run_test(url_arg: Url, requests: i32, connections: i32) -> Result<()> {
+    let correlation_id = Uuid::new_v4();
     let url = Arc::new(url_arg);
     let succeeded = Arc::new(Mutex::new(0));
+    
+    println!("correlation id: {}", correlation_id);
 
     let (sender, mut reciever) = mpsc::channel(connections as usize);
     task::spawn(async move {
@@ -20,7 +24,7 @@ pub async fn run_test(url_arg: Url, requests: i32, connections: i32) -> Result<(
             let url = Arc::clone(&url);
             let handle = task::spawn(async move {
                 let url = Arc::clone(&url);
-                let client = Client::builder().user_agent(get_user_agent()).build()?;
+                let client = Client::builder().user_agent(get_user_agent(correlation_id)).build()?;
                 client.request(Method::GET, url.as_str()).send().await
             });
             sender.send(handle).await;
