@@ -97,20 +97,10 @@ fn get_cya_result(response_results: Vec<(Result<Response, Error>, Duration)>) ->
     let mut succeeded = 0;
     let mut failed = 0;
     let mut response_codes = HashMap::new();
-    
-    let mut min = Min::new();
-    let mut p50 = Quantile::new(0.5);
-    let mut p95 = Quantile::new(0.95);
-    let mut p99 = Quantile::new(0.99);
-    let mut max = Max::new();
+    let mut durations = vec![];
     
     for (result, duration) in response_results {
-        let duration = duration.as_secs_f64();
-        min.add(duration);
-        p50.add(duration);
-        p95.add(duration);
-        p99.add(duration);
-        max.add(duration);
+        durations.push(duration.as_secs_f64());
         
         match result {
             Ok(res) => {
@@ -127,18 +117,36 @@ fn get_cya_result(response_results: Vec<(Result<Response, Error>, Duration)>) ->
         }
     }
     
-    let histogram = CyaHistogram {
-        min: min.min(),
-        p50: p50.quantile(),
-        p95: p95.quantile(),
-        p99: p99.quantile(),
-        max: max.max(),
-    };
+    let histogram = get_cya_histogram(durations);
     
     CyaResult {
         succeeded,
         failed,
         histogram,
         response_codes,
+    }
+}
+
+fn get_cya_histogram(durations: Vec<f64>) -> CyaHistogram {
+    let mut min = Min::new();
+    let mut p50 = Quantile::new(0.5);
+    let mut p95 = Quantile::new(0.95);
+    let mut p99 = Quantile::new(0.99);
+    let mut max = Max::new();
+    
+    for duration in durations {
+        min.add(duration);
+        p50.add(duration);
+        p95.add(duration);
+        p99.add(duration);
+        max.add(duration);
+    }
+    
+    CyaHistogram {
+        min: min.min(),
+        p50: p50.quantile(),
+        p95: p95.quantile(),
+        p99: p99.quantile(),
+        max: max.max(),
     }
 }
