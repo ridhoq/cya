@@ -13,22 +13,31 @@ fn get_user_agent(id: Uuid) -> String {
 /// Runs the load test
 pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
     let correlation_id = Uuid::new_v4();
+    let client = Arc::new(
+        Client::builder()
+            .user_agent(get_user_agent(correlation_id))
+            .build()?,
+    );
     let url = Arc::new(url);
     let succeeded = Arc::new(Mutex::new(0));
     let failed = Arc::new(Mutex::new(0));
-    
+
     println!("correlation id: {}", correlation_id);
 
     let (sender, mut reciever) = mpsc::channel(connections as usize);
     task::spawn(async move {
         for _ in 0..requests {
+            let client = Arc::clone(&client);
             let url = Arc::clone(&url);
             let handle = task::spawn(async move {
+                let client = Arc::clone(&client);
                 let url = Arc::clone(&url);
-                let client = Client::builder().user_agent(get_user_agent(correlation_id)).build()?;
                 client.request(Method::GET, url.as_str()).send().await
             });
-            sender.send(handle).await.expect("Failed to send to receiver");
+            sender
+                .send(handle)
+                .await
+                .expect("Failed to send to receiver");
         }
     });
 
@@ -37,18 +46,18 @@ pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
             let result = handle.await.expect("oops");
             match result {
                 Ok(res) => {
-                    if res.status().is_success(){
+                    if res.status().is_success() {
                         let mut succeeded = succeeded.lock().expect("Could not acquire lock");
                         *succeeded += 1;
-                    } 
-                },
+                    }
+                }
                 Err(_) => {
                     let mut failed = failed.lock().expect("Could not acquire lock");
                     *failed += 1;
                 }
-            } 
+            }
         }
-        
+
         let succeeded = succeeded.lock().unwrap();
         let failed = failed.lock().unwrap();
         println!("succeeded requests: {}", *succeeded);
