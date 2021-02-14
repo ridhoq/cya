@@ -70,8 +70,6 @@ pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
 
     let (sender, mut reciever) = mpsc::channel(connections as usize);
 
-    let now = Instant::now();
-
     task::spawn(async move {
         for _ in 0..requests {
             let client = Arc::clone(&client);
@@ -79,7 +77,10 @@ pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
             let handle = task::spawn(async move {
                 let client = Arc::clone(&client);
                 let url = Arc::clone(&url);
-                client.request(Method::GET, url.as_str()).send().await
+                let now = Instant::now();
+                let result = client.request(Method::GET, url.as_str()).send().await;
+                let duration = now.elapsed();
+                (result, duration)
             });
             sender
                 .send(handle)
@@ -93,8 +94,7 @@ pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
 
         while let Some(handle) = reciever.recv().await {
             let result = handle.await.expect("oops");
-            let duration = now.elapsed();
-            response_results.push((result, duration));
+            response_results.push(result);
         }
 
         let result = get_cya_result(response_results);
