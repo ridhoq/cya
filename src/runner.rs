@@ -12,6 +12,18 @@ use uuid::Uuid;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct CyaFailureReasons {
+    body: u32,
+    builder: u32,
+    connect: u32,
+    decode: u32,
+    redirect: u32,
+    status: u32,
+    timeout: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct CyaHistogram {
     min: f64,
     p50: f64,
@@ -27,6 +39,7 @@ struct CyaResult {
     failed: i32,
     histogram: CyaHistogram,
     response_codes: HashMap<String, i32>,
+    failure_reasons: CyaFailureReasons,
 }
 
 fn get_user_agent(id: Uuid) -> String {
@@ -96,8 +109,10 @@ pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
 fn get_cya_result(response_results: Vec<(Result<Response, Error>, Duration)>) -> CyaResult {
     let mut succeeded = 0;
     let mut failed = 0;
+    
     let mut response_codes = HashMap::new();
     let mut durations = vec![];
+    let mut errors = vec![];
     
     for (result, duration) in response_results {
         durations.push(duration.as_secs_f64());
@@ -111,19 +126,27 @@ fn get_cya_result(response_results: Vec<(Result<Response, Error>, Duration)>) ->
                     succeeded += 1;
                 }
             }
-            Err(_) => {
+            Err(err) => {
                 failed += 1;
+                if let Some(status) = err.status() {
+                    let response_code_count =
+                        response_codes.entry(status.to_string()).or_insert(0);
+                    *response_code_count += 1;
+                }
+                errors.push(err);
             }
         }
     }
     
     let histogram = get_cya_histogram(durations);
+    let failure_reasons = get_cya_failure_reasons(errors);
     
     CyaResult {
         succeeded,
         failed,
         histogram,
         response_codes,
+        failure_reasons,
     }
 }
 
@@ -148,5 +171,33 @@ fn get_cya_histogram(durations: Vec<f64>) -> CyaHistogram {
         p95: p95.quantile(),
         p99: p99.quantile(),
         max: max.max(),
+    }
+}
+
+fn get_cya_failure_reasons(errors: Vec<Error>) -> CyaFailureReasons {
+    let mut body = 0;
+    let mut builder = 0;
+    let mut connect =  0;
+    let mut decode =  0;
+    let mut redirect =  0;
+    let mut status =  0;
+    let mut timeout =  0;
+    for err in errors {
+        if err.is_body() { body += 1 }
+        if err.is_builder() { builder += 1 }
+        if err.is_connect() { connect += 1 }
+        if err.is_decode() { decode += 1 }
+        if err.is_redirect() { redirect += 1 }
+        if err.is_status() { status += 1 }
+        if err.is_timeout() {timeout += 1 }
+    }
+    CyaFailureReasons {
+        body,
+        builder,
+        connect,
+        decode,
+        redirect,
+        status,
+        timeout,
     }
 }
