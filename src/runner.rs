@@ -11,6 +11,16 @@ fn get_user_agent(id: Uuid) -> String {
 }
 
 /// Runs the load test
+/// 
+/// The load tester generates load by spawning tasks that make the HTTP request.
+/// It creates a channel that is bounded by the connections argument which effectively controls the
+/// number of concurrent connections at any given time.
+/// 
+/// The sender task starts a task that makes the HTTP request and sends the handle of that task to
+/// the receiver task
+/// 
+/// The receiver task awaits the result of the HTTP request tasks and counts the number of successes
+/// and failures. In the future, this will do further aggregation of response status codes and durations.
 pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
     let correlation_id = Uuid::new_v4();
     let client = Arc::new(
@@ -23,8 +33,9 @@ pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
     let failed = Arc::new(Mutex::new(0));
 
     println!("correlation id: {}", correlation_id);
-
+    
     let (sender, mut reciever) = mpsc::channel(connections as usize);
+    
     task::spawn(async move {
         for _ in 0..requests {
             let client = Arc::clone(&client);
