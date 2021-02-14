@@ -11,9 +11,9 @@ fn get_user_agent(id: Uuid) -> String {
 }
 
 /// Runs the load test
-pub async fn run_test(url_arg: Url, requests: i32, connections: i32) -> Result<()> {
+pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
     let correlation_id = Uuid::new_v4();
-    let url = Arc::new(url_arg);
+    let url = Arc::new(url);
     let succeeded = Arc::new(Mutex::new(0));
     let failed = Arc::new(Mutex::new(0));
     
