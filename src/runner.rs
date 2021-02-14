@@ -15,6 +15,7 @@ pub async fn run_test(url_arg: Url, requests: i32, connections: i32) -> Result<(
     let correlation_id = Uuid::new_v4();
     let url = Arc::new(url_arg);
     let succeeded = Arc::new(Mutex::new(0));
+    let failed = Arc::new(Mutex::new(0));
     
     println!("correlation id: {}", correlation_id);
 
@@ -32,16 +33,26 @@ pub async fn run_test(url_arg: Url, requests: i32, connections: i32) -> Result<(
     });
 
     let receive_handle = task::spawn(async move {
-        while let Some(res) = reciever.recv().await {
-            let thing = res.await.expect("oops");
-            let real_res = thing.expect("oof");
-            if real_res.status().is_success() {
-                let mut succeeded_lock = succeeded.lock().expect("Could not acquire lock");
-                *succeeded_lock += 1;
-            }
+        while let Some(handle) = reciever.recv().await {
+            let result = handle.await.expect("oops");
+            match result {
+                Ok(res) => {
+                    if res.status().is_success(){
+                        let mut succeeded = succeeded.lock().expect("Could not acquire lock");
+                        *succeeded += 1;
+                    } 
+                },
+                Err(_) => {
+                    let mut failed = failed.lock().expect("Could not acquire lock");
+                    *failed += 1;
+                }
+            } 
         }
-        let succeeded_lock = succeeded.lock().unwrap();
-        println!("succeeded requests: {}", *succeeded_lock);
+        
+        let succeeded = succeeded.lock().unwrap();
+        let failed = failed.lock().unwrap();
+        println!("succeeded requests: {}", *succeeded);
+        println!("failed requests: {}", *failed);
     });
 
     receive_handle.await?;
