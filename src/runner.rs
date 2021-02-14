@@ -28,7 +28,7 @@ pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
                 let client = Client::builder().user_agent(get_user_agent(correlation_id)).build()?;
                 client.request(Method::GET, url.as_str()).send().await
             });
-            sender.send(handle).await;
+            sender.send(handle).await.expect("Failed to send to receiver");
         }
     });
 
