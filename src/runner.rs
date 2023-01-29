@@ -57,7 +57,7 @@ fn get_user_agent(id: Uuid) -> String {
 ///
 /// The receiver task awaits the result of the HTTP request tasks and counts the number of successes
 /// and failures. In the future, this will do further aggregation of response status codes and durations.
-pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
+pub async fn run_test(url: Url, method: Method, requests: i32, connections: i32) -> Result<()> {
     let correlation_id = Uuid::new_v4();
     let client = Arc::new(
         Client::builder()
@@ -78,7 +78,7 @@ pub async fn run_test(url: Url, requests: i32, connections: i32) -> Result<()> {
                 let client = Arc::clone(&client);
                 let url = Arc::clone(&url);
                 let now = Instant::now();
-                let result = client.request(Method::GET, url.as_str()).send().await;
+                let result = client.request(method, url.as_str()).send().await;
                 let duration = now.elapsed();
                 (result, duration)
             });
